@@ -34,27 +34,27 @@ USE_LLM      = False
 USE_ARM82    = False
 
 if len(sys.argv) > 1 and sys.argv[1] != None:
-    if "trt" in sys.argv[1]:
+    if "trt" in sys.argv[1:]:
         USE_TRT = True
-    if "cuda" in sys.argv[1]:
+    if "cuda" in sys.argv[1:]:
         USE_CUDA = True
-    if "cuda_tune" in sys.argv[1]:
+    if "cuda_tune" in sys.argv[1:]:
         USE_CUDA_TUNE = True
-    if "opencl" in sys.argv[1]:
+    if "opencl" in sys.argv[1:]:
         USE_OPENCL = True
-    if "vulkan" in sys.argv[1]:
+    if "vulkan" in sys.argv[1:]:
         USE_VULKAN = True
-    if "torch" in sys.argv[1]:
+    if "torch" in sys.argv[1:]:
         USE_TORCH = True
-    if "internal" in sys.argv[1]:
+    if "internal" in sys.argv[1:]:
         USE_INTERNAL = True
-    if "render" in sys.argv[1]:
+    if "render" in sys.argv[1:]:
         USE_RENDER = True
-    if "no_sse" in sys.argv[1]:
+    if "no_sse" in sys.argv[1:]:
         USE_SSE = False
-    if "openmp" in sys.argv[1]:
+    if "openmp" in sys.argv[1:]:
         USE_OPENMP = True
-    if "llm" in sys.argv[1]:
+    if "llm" in sys.argv[1:]:
         USE_LLM = True
 
 if IS_ARM: USE_ARM82 = True
@@ -62,8 +62,7 @@ if IS_ARM: USE_ARM82 = True
 print ("USE_INTERNAL:", USE_INTERNAL)
 print ("USE_TRT:", USE_TRT)
 print ("USE_CUDA:", USE_CUDA)
-if USE_CUDA_TUNE:
-    print ("USE_CUDA_TUNE, please note: this function only support Ampere Arch now!")
+if USE_CUDA_TUNE: print ("USE_CUDA_TUNE, please note: this function only support Ampere Arch now!")
 print ("USE_OPENCL:", USE_OPENCL)
 print ("USE_VULKAN:", USE_VULKAN)
 print ("USE_RENDER:", USE_RENDER)
@@ -97,8 +96,9 @@ def build_deps():
         extra_opts += ' -DMNN_USE_THREAD_POOL=OFF -DMNN_METAL=ON '
 
     if IS_WINDOWS:
+        extra_opts += ' -DMNN_CUDA=ON ' if USE_CUDA else ' '
         os.system('cmake -G "Ninja" ' + extra_opts +' -DMNN_BUILD_TRAIN=ON -DMNN_BUILD_CONVERTER=on -DMNN_BUILD_TORCH=OFF\
-            -DMNN_BUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DMNN_WIN_RUNTIME_MT=ON\
+            -DMNN_BUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON -DMNN_BUILD_AUDIO=ON -DMNN_AAPL_FMWK=OFF -DMNN_SEP_BUILD=OFF .. && ninja MNN MNNConvertDeps')
     elif IS_LINUX:
         extra_opts += '-DMNN_TENSORRT=ON \

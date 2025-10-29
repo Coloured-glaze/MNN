@@ -13,17 +13,18 @@ archs = ["native"]
 build = "cp*-macosx_*"
 before-all = [
     "pushd pymnn/pip_package",
-    "python3 build_deps.py llm",
+    "python3 build_deps.py $BUILD_ARGS",
     "popd"
 ]
 repair-wheel-command = ""
+environment = { MNN_VERSION = "$MNN_VERSION", BUILD_ARGS = "$BUILD_ARGS" }
 
 [tool.cibuildwheel.linux]
 build = "cp*-manylinux*"
 skip = "pp*"
 before-all = [
     "pushd pymnn/pip_package",
-    "python3 build_deps.py llm",
+    "python3 build_deps.py $BUILD_ARGS",
     "popd"
 ]
 archs = ["native"]
@@ -32,10 +33,12 @@ repair-wheel-command = [
     "echo $LD_LIBRARY_PATH",
     "auditwheel repair -w {dest_dir} {wheel}"
 ]
+environment = { MNN_VERSION = "$MNN_VERSION", BUILD_ARGS = "$BUILD_ARGS" }
 
 [tool.cibuildwheel.windows]
 before-all = [
     "cd pymnn/pip_package",
-    "python3 build_deps.py llm",
+    "python3 build_deps.py %BUILD_ARGS%",
     "cd ../.."
 ]
+environment = { MNN_VERSION = "$MNN_VERSION", BUILD_ARGS = "$BUILD_ARGS" }
