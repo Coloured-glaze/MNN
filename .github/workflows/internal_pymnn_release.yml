@@ -12,6 +12,14 @@ on:
         default: 'llm'
         required: false
         type: string
+      install_cuda:
+        description: 'Install CUDA on Windows'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '0'
+        default: '0'
 
 jobs:
   build_wheels:
@@ -33,6 +41,34 @@ jobs:
     - name: using msvc
       if: matrix.os == 'windows-latest'
       uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install CUDA on Windows
+      if: matrix.os == 'windows-latest' && inputs.install_cuda == '1'
+      run: |
+        # Download CUDA installer
+        $cudaVersion = "12.1.1"
+        $cudaInstaller = "cuda_${cudaVersion}_531.14_windows.exe"
+        $cudaUrl = "https://developer.download.nvidia.com/compute/cuda/${cudaVersion}/local_installers/${cudaInstaller}"
+        
+        Write-Host "Downloading CUDA installer from $cudaUrl"
+        Invoke-WebRequest -Uri $cudaUrl -OutFile $cudaInstaller
+        
+        # Install CUDA silently
+        Write-Host "Installing CUDA..."
+        Start-Process -FilePath $cudaInstaller -ArgumentList "-s" -Wait
+        
+        # Set CUDA environment variables
+        $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${cudaVersion}"
+        [Environment]::SetEnvironmentVariable("CUDA_PATH", $cudaPath, "Machine")
+        [Environment]::SetEnvironmentVariable("CUDA_HOME", $cudaPath, "Machine")
+        $cudaBinPath = "$cudaPath\bin"
+        [Environment]::SetEnvironmentVariable("Path", $env:Path + ";$cudaBinPath", "Machine")
+        
+        # Verify installation
+        nvcc --version
+        
+        Write-Host "CUDA installation completed"
+      shell: powershell
 
     - name: using private schema patch
       if: matrix.os != 'windows-latest'
@@ -90,6 +126,7 @@ jobs:
         
         echo "Python version: ${PYTHON_VERSION}"
         echo "Python version for cibuildwheel: ${CIBW_BUILD}"
+      shell: bash
 
     - name: Process build options
       id: build_options
