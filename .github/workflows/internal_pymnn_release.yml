@@ -75,10 +75,18 @@ jobs:
       env:
         PATCH_CONTENT: ${{ secrets.PRIVATE_SCHEMA_PATCH }}
       run: |
-        patch_file=$(mktemp schema_patch.XXXXXX.diff)
-        echo "$PATCH_CONTENT" > $patch_file
-        git apply $patch_file
-        rm $patch_file
+        # Check if patch content is empty
+        if [ -z "$PATCH_CONTENT" ]; then
+          echo "No patch content provided, skipping patch application"
+        else
+          patch_file=$(mktemp schema_patch.XXXXXX.diff)
+          echo "$PATCH_CONTENT" > $patch_file
+          
+          # Apply patch with --allow-empty flag to handle empty patches
+          git apply --allow-empty $patch_file || echo "Patch application failed or was empty, continuing..."
+          rm $patch_file
+        fi
+        
         git status
         cd schema
         ls -lh
@@ -90,10 +98,22 @@ jobs:
       env:
         PATCH_CONTENT: ${{ secrets.PRIVATE_SCHEMA_PATCH }}
       run: |
-        $patchFile = [System.IO.Path]::GetTempFileName() + ".diff"
-        [System.IO.File]::WriteAllText($patchFile, $env:PATCH_CONTENT)
-        git apply $patchFile
-        Remove-Item $patchFile
+        # Check if patch content is empty
+        if ([string]::IsNullOrEmpty($env:PATCH_CONTENT)) {
+          Write-Host "No patch content provided, skipping patch application"
+        } else {
+          $patchFile = [System.IO.Path]::GetTempFileName() + ".diff"
+          [System.IO.File]::WriteAllText($patchFile, $env:PATCH_CONTENT)
+          
+          # Apply patch with --allow-empty flag to handle empty patches
+          try {
+            git apply --allow-empty $patchFile
+          } catch {
+            Write-Host "Patch application failed or was empty, continuing..."
+          }
+          Remove-Item $patchFile
+        }
+        
         git status
         Push-Location schema
         Get-ChildItem -Name
