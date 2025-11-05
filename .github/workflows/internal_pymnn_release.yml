@@ -8,8 +8,8 @@ on:
         required: true
         type: string
       build_options:
-        description: 'Build options (comma-separated): cuda, opencl, vulkan, openmp, trt, torch, internal, render, no_sse, cuda_tune'
-        default: 'llm'
+        description: 'Build options (comma-separated): cuda, llm, opencl, vulkan, openmp, trt, torch, internal, render, no_sse, cuda_tune'
+        default: 'llm, opencl, vulkan, openmp'
         required: false
         type: string
       install_cuda:
@@ -199,7 +199,9 @@ jobs:
         CIBW_ARCHS_WINDOWS: ${{ matrix.arch }}
         CIBW_BUILD: ${{ env.CIBW_BUILD }}
         CIBW_BUILD_VERBOSITY: 1
-        CIBW_ENVIRONMENT: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+        CIBW_ENVIRONMENT_LINUX: MNN_USE_SYSTEM_LIB=true MNN_SEP_BUILD=false CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+        CIBW_ENVIRONMENT_MACOS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+        CIBW_ENVIRONMENT_WINDOWS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
       with:
         package-dir: pymnn/pip_package
         output-dir: wheelhouse
