@@ -46,8 +46,8 @@ jobs:
       run: |
         whoami
         df -h && free -g
-        cd / && du -s -h $(ls)
-        cd /usr && du -s -h $(ls) || true
+        # cd / && du -s -h $(ls)
+        # cd /usr && du -s -h $(ls) || true
         rm -rf /usr/share/dotnet > /dev/null || true
         rm -rf /opt/ghc > /dev/null || true
         rm -rf /opt/hostedtoolcache/CodeQL > /dev/null || true
