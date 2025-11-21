@@ -205,8 +205,8 @@ jobs:
                 print(word, end='', flush=True)
 
         model_path = os.environ.get('model_dir', '')
-        img_path = os.path.join(os.getcwd(), 'resource/images/cat.jpg'))
         print(f"model_path: {model_path}")
+        img_path = os.path.join(os.getcwd(), 'resource/images/cat.jpg')
         print(f"img_path: {img_path}")
 
         if not os.path.exists(model_path): print(f'model not exists: {model_path}'); exit(1)
