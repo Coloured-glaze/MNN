@@ -9,12 +9,12 @@ on:
         type: string
       build_options:
         description: 'Build options (comma-separated): llm, opencl, vulkan, openmp, trt, torch, cuda, internal, render, no_sse, cuda_tune'
-        default: 'llm, opencl, vulkan, openmp'
+        default: 'llm'
         required: false
         type: string
       model_repo:
-        description: 'HuggingFace model repo'
-        default: 'taobao-mnn/Qwen3-VL-2B-Instruct-Eagle3-MNN'
+        description: 'HuggingFace model repo, default: taobao-mnn/Qwen3-VL-4B-Instruct-MNN or taobao-mnn/Qwen3-VL-2B-Instruct-Eagle3-MNN '
+        default: 'taobao-mnn/Qwen3-VL-4B-Instruct-MNN'
         required: true
         type: string
       repository:
@@ -224,6 +224,7 @@ jobs:
             "用自然语言简单描述图片",
             "用自然语言详细描述图片",
             "简单描述图片，减少形容词使用",
+            "简单描述图片的内容，使用英文的自然语言形式进行回复",
             "简单描述图片的内容，适当地添加少量形容词，使用英文的自然语言形式进行回复",
         ]
         for prompt_text in prompt_list:
@@ -234,4 +235,4 @@ jobs:
                 ]
             }
             generate_example(model, prompt)
-            print('============================================================')
+            print('\n============================================================')
