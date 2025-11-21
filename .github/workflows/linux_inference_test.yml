@@ -1,0 +1,223 @@
+name: linux_inference_test
+on:
+  workflow_dispatch:
+    inputs:
+      python_version:
+        description: 'Python version'
+        default: '3.10'
+        required: true
+        type: string
+      build_options:
+        description: 'Build options (comma-separated): llm, opencl, vulkan, openmp, trt, torch, cuda, internal, render, no_sse, cuda_tune'
+        default: 'llm, opencl, vulkan, openmp'
+        required: false
+        type: string
+      model_repo:
+        description: 'HuggingFace model repo'
+        default: 'taobao-mnn/Qwen3-VL-2B-Instruct-Eagle3-MNN'
+        required: true
+        type: string
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,    arch: x86_64 }
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Free up disk space
+      if: ${{ runner.os == 'Linux' }}
+      # https://github.com/easimon/maximize-build-space/blob/master/action.yml
+      # https://github.com/easimon/maximize-build-space/tree/test-report
+      run: |
+        whoami
+        df -h && free -g
+        cd / && du -s -h $(ls)
+        cd /usr && du -s -h $(ls)
+        rm -rf /usr/share/dotnet > /dev/null || true
+        rm -rf /opt/ghc > /dev/null || true
+        rm -rf /opt/hostedtoolcache/CodeQL > /dev/null || true
+        df -h && free -g
+      shell: bash 
+        
+    - name: Setup Python ${{ inputs.python_version }}
+      uses: actions/setup-python@v6
+      with:
+          python-version: ${{ inputs.python_version }}
+          update-environment: true
+
+    - name: Set Python version for cibuildwheel
+      run: |
+        PYTHON_VERSION="${{ inputs.python_version }}"
+        PYTHON_VERSION_MAJMIN="$(echo "${PYTHON_VERSION}" | cut -d '.' -f-2)"
+        PYTHON_VERSION_MAJMIN_NODOT="${PYTHON_VERSION_MAJMIN//./}"
+        echo "PYTHON_VERSION_MAJMIN_NODOT=${PYTHON_VERSION_MAJMIN_NODOT}" >> $GITHUB_ENV
+        
+        # Set build pattern based on OS
+        if [[ "${{ matrix.os }}" == *"windows"* ]]; then
+          echo "CIBW_BUILD=cp${PYTHON_VERSION_MAJMIN_NODOT}-*" >> $GITHUB_ENV
+        elif [[ "${{ matrix.os }}" == *"ubuntu"* ]]; then
+          echo "CIBW_BUILD=cp${PYTHON_VERSION_MAJMIN_NODOT}-manylinux*" >> $GITHUB_ENV
+        else
+          echo "CIBW_BUILD=cp${PYTHON_VERSION_MAJMIN_NODOT}-*" >> $GITHUB_ENV
+        fi
+        
+        echo "Python version: ${PYTHON_VERSION}"
+        echo "Python version for cibuildwheel: ${CIBW_BUILD}"
+      shell: bash
+
+    - name: Process build options
+      id: build_options
+      run: |
+        import os
+        import sys
+        
+        # Get build options from input
+        build_options = "${{ inputs.build_options }}"
+        
+        # Convert comma-separated options to space-separated
+        build_args = build_options.replace(',', ' ')
+        
+        # Ensure llm is always included
+        if "llm" not in build_args:
+            build_args = f"{build_args} llm"
+        
+        # Remove leading/trailing spaces
+        build_args = build_args.strip()
+        
+        # Set output for later steps
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f"build_args={build_args}\n")
+        
+        print(f"Build options: {build_options}")
+        print(f"Build args: {build_args}")
+      shell: python
+
+    - name: Get version from git tag
+      id: get_version
+      run: |
+        # Try to get the latest tag
+        TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+        if [ -z "$TAG" ]; then
+          VERSION="1.0.0"
+          echo "No git tag found, using default version: $VERSION"
+        else
+          # Remove 'v' prefix if present
+          VERSION=${TAG#v}
+          echo "Found git tag: $TAG, using version: $VERSION"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "mnn_commit_hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        echo $mnn_commit_hash
+      shell: bash
+
+    - name: Build wheels
+      uses: pypa/cibuildwheel@v2.21.3
+      env:
+        CIBW_ARCHS_MACOS: ${{ matrix.arch }}
+        CIBW_ARCHS_LINUX: ${{ matrix.arch }}
+        CIBW_ARCHS_WINDOWS: ${{ matrix.arch }}
+        CIBW_BUILD: ${{ env.CIBW_BUILD }}
+        CIBW_BUILD_VERBOSITY: 1
+        CIBW_ENVIRONMENT_LINUX: MNN_USE_SYSTEM_LIB=true MNN_SEP_BUILD=false CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+        CIBW_ENVIRONMENT_MACOS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+        CIBW_ENVIRONMENT_WINDOWS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+      with:
+        package-dir: pymnn/pip_package
+        output-dir: wheelhouse
+        config-file: "{package}/pyproject.toml"
+
+    - name: Show files
+      run: |
+        ls -lh wheelhouse
+        python -m pip install huggingface_hub==0.35.3 -q
+        python -m pip install wheelhouse/*.whl
+      shell: bash
+
+    - name: Download Models
+      shell: python
+      run: |
+        import os
+        from huggingface_hub import snapshot_download
+
+        repo = ${{ inputs.model_repo }}
+        model_dir = snapshot_download(f'{repo}', cache_dir=f'{repo}', local_dir=f'{repo}')
+        print(f"model_dir: {model_dir}")
+
+        with open(os.environ['GITHUB_ENV'], 'a') as f:
+            f.write(f"model_dir={model_dir}\n")
+
+    - name : Run tests
+      shell: python
+      run: |
+        import MNN.llm as llm
+        import MNN.cv as cv, MNN.numpy as np
+        import os 
+
+        def generate_example(model, prompt):
+            prompt['text'] = model.apply_chat_template(prompt['text'])
+            ids = model.tokenizer_encode(prompt)
+            model.generate_init()
+            logits = model.forward(ids)
+            token = np.argmax(logits)
+            model.context.current_token = token
+            first_token = model.tokenizer_decode(token)
+            print(f"token: {token}, first word: {first_token}")
+            print(first_token, end='', flush=True) # first token
+            while True:
+                logits = model.forward(token)
+                token = np.argmax(logits)
+                model.context.current_token = token
+                if model.stoped(): break
+                try:
+                    word = model.tokenizer_decode(token)
+                except Exception as e:
+                    print(f"解码token {token} {type(token)} 时出错: {str(e)}")
+                    word = ""
+                print(word, end='', flush=True)
+
+        model_path = os.environ.get('model_dir', '')
+        img_path = os.path.join(os.getcwd(), 'resource/images/cat.jpg'))
+        print(f"model_path: {model_path}")
+        print(f"img_path: {img_path}")
+
+        if not os.path.exists(model_path): print(f'model not exists: {model_path}'); exit(1)
+        if not os.path.exists(img_path): print(f'image not exists: {img_path}'); exit(1)
+
+        config_path = os.path.join(model_path, 'config.json')
+        model = llm.create(config_path) # create model
+        model.load() # load model
+        img = cv.imread(img_path)
+        if img is None: print(f'read image failed: {img_path}'); exit(1)
+        
+        prompt_list = [
+            "简要描述图片内容",
+            "详细描述图片内容",
+            "用自然语言简单描述图片",
+            "用自然语言详细描述图片",
+            "简单描述图片，减少形容词使用",
+            "简单描述图片的内容，适当地添加少量形容词，使用英文的自然语言形式进行回复",
+        ]
+        for prompt_text in prompt_list:
+            prompt = {
+                'text': '<img>image_0</img>' + prompt_text,
+                'images': [
+                    { 'data': img, 'height': 420, 'width': 420 }
+                ]
+            }
+            generate_example(model, prompt)
+            print('============================================================')
+
+    - name: Upload wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: artifact-${{ matrix.os }}-${{ matrix.arch }}
+        path: wheelhouse/*.whl
