@@ -13,8 +13,8 @@ on:
         required: false
         type: string
       model_repo:
-        description: 'HuggingFace model repo, default: taobao-mnn/Qwen3-VL-4B-Instruct-MNN or taobao-mnn/Qwen3-VL-2B-Instruct-Eagle3-MNN '
-        default: 'taobao-mnn/Qwen3-VL-4B-Instruct-MNN'
+        description: 'HuggingFace model repo, taobao-mnn/Qwen3-VL-2B-Instruct-MNN, taobao-mnn/Qwen3-VL-4B-Instruct-MNN, taobao-mnn/Qwen3-VL-2B-Instruct-Eagle3-MNN, taobao-mnn/Qwen3-VL-4B-Instruct-Eagle3-MNN'
+        default: 'taobao-mnn/Qwen3-VL-2B-Instruct-MNN'
         required: true
         type: string
       repository:
@@ -162,7 +162,7 @@ jobs:
         compression-level: 9 
         retention-days: 14
 
-    - name: Download Models
+    - name: Download Models ${{ inputs.model_repo }}
       shell: python
       run: |
         import os
@@ -235,4 +235,4 @@ jobs:
                 ]
             }
             generate_example(model, prompt)
-            print('\n============================================================')
+            print('\n\n============================================================')
