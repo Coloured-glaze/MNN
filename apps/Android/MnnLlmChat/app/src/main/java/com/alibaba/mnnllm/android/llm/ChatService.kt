@@ -34,7 +34,9 @@ class ChatService {
             sessionIdParam!!
         }
         
-        val session = if (ModelTypeUtils.isDiffusionModel(modelName)) {
+        val session = if (ModelTypeUtils.isSanaModel(modelName)) {
+            SanaSession(modelId, sessionId, configPath!!, historyList)
+        } else if (ModelTypeUtils.isDiffusionModel(modelName)) {
             DiffusionSession(sessionId, configPath!!, historyList)
         } else {
             val llmSession = LlmSession(modelId, sessionId, configPath!!, historyList)
@@ -58,14 +60,15 @@ class ChatService {
         modelDir: String?,
         sessionIdParam: String?,
         chatDataItemList: List<ChatDataItem>?,
-        supportOmni:Boolean
+        supportOmni:Boolean,
+        backendType: String? = null
     ): LlmSession {
         var sessionId:String = if (TextUtils.isEmpty(sessionIdParam)) {
             System.currentTimeMillis().toString()
         } else {
             sessionIdParam!!
         }
-        val session = LlmSession(modelId!!, sessionId, modelDir!!, chatDataItemList)
+        val session = LlmSession(modelId!!, sessionId, modelDir!!, chatDataItemList, backendType)
         session.supportOmni = supportOmni
         transformerSessionMap[sessionId] = session
         return session

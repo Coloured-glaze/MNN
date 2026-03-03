@@ -55,8 +55,8 @@ object ChatViewHolders {
             itemView.findViewById(R.id.layout_audio)
         val viewText: TextView = itemView.findViewById(R.id.tv_chat_text)
 
-        val chatImage: ImageView =
-            itemView.findViewById(R.id.tv_chat_image)
+        val chatImagesRecycler: RecyclerView =
+            itemView.findViewById(R.id.rv_chat_images)
 
         val chatVideo: com.alibaba.mnnllm.android.widgets.VideoPreviewView =
             itemView.findViewById(R.id.tv_chat_video)
@@ -86,11 +86,14 @@ object ChatViewHolders {
             viewText.visibility =
                 if (TextUtils.isEmpty(data.text)) View.GONE else View.VISIBLE
             textDuration.text = formatTime(data.audioDuration.toInt())
-            val imageUri = data.imageUri
-            chatImage.visibility =
-                if (imageUri != null) View.VISIBLE else View.GONE
-            if (imageUri != null) {
-                chatImage.setImageURI(imageUri)
+            
+            val imageUris = data.imageUris
+            chatImagesRecycler.visibility =
+                if (!imageUris.isNullOrEmpty()) View.VISIBLE else View.GONE
+            if (!imageUris.isNullOrEmpty()) {
+                Log.d("UserViewHolder", "Binding ${imageUris.size} images")
+                chatImagesRecycler.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(itemView.context, androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL, false)
+                chatImagesRecycler.adapter = ChatImageAdapter(imageUris)
             }
 
             val videoUri = data.videoUri
@@ -188,6 +191,7 @@ object ChatViewHolders {
         private val reportIssueButton: View = view.findViewById(R.id.btn_report_issue)
         private val toggleBenchmarkButton: View = view.findViewById(R.id.btn_toggle_benchmark)
         private val replayAudioButton: View = view.findViewById(R.id.btn_replay_audio)
+        private val shareImageButton: View = view.findViewById(R.id.btn_share_image)
 
         private val markdown = Markwon.create(itemView.context)
         var viewAssistantLoading: View =
@@ -212,6 +216,7 @@ object ChatViewHolders {
                 false
             }
             imageGenerated.setOnClickListener(this)
+            imageGenerated.setOnLongClickListener(this)
             thinkingToggle.setOnClickListener {
                 val chatDataItem = it.tag as ChatDataItem
                 chatDataItem.toggleThinking()
@@ -248,7 +253,15 @@ object ChatViewHolders {
                 val chatDataItem = it.tag as ChatDataItem
                 replayAudio(chatDataItem)
             }
+            shareImageButton.setOnClickListener {
+                val chatDataItem = it.tag as ChatDataItem
+                val imageUri = chatDataItem.imageUri
+                if (imageUri != null) {
+                    com.alibaba.mnnllm.android.utils.ImageUtils.showImageMenu(it.context, imageUri)
+                }
+            }
         }
+
 
         private fun  updatePointerDownLocation(v:View, event: MotionEvent) {
             val location = IntArray(2)
@@ -317,6 +330,7 @@ object ChatViewHolders {
             reportIssueButton.tag = data
             toggleBenchmarkButton.tag = data
             replayAudioButton.tag = data
+            shareImageButton.tag = data
         }
         
         private fun updateThinkingView(data: ChatDataItem, context: android.content.Context) {
@@ -354,8 +368,21 @@ object ChatViewHolders {
         }
 
         override fun onLongClick(v: View): Boolean {
-            val textView = v as TextView
-            val chatDataItem = v.getTag() as ChatDataItem
+            Log.d(TAG, "onLongClick: v.id=${v.id}")
+            val chatDataItem = v.tag as? ChatDataItem ?: return false
+            if (v.id == R.id.image_generated) {
+                val imageUri = chatDataItem.imageUri
+                if (imageUri != null) {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                    com.alibaba.mnnllm.android.utils.ImageUtils.showImageMenu(v.context, imageUri)
+                    return true
+                }
+                Log.w(TAG, "onLongClick: imageUri is null")
+                return false
+            }
+            
+            val textView = v as? TextView ?: return false
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
             PopupWindowHelper().showPopupWindow(
                 v.getContext(), v, this.lastTouchX, this.lastTouchY
             ) { v ->
@@ -400,6 +427,9 @@ object ChatViewHolders {
                     View.VISIBLE 
                 else 
                     View.GONE
+                
+                // Show/hide share button based on image availability
+                shareImageButton.visibility = if (data.imageUri != null) View.VISIBLE else View.GONE
             }
         }
         
