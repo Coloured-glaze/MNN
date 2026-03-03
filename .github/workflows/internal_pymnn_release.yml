@@ -307,6 +307,39 @@ jobs:
                 f.write(f"AVXVER={avxver}\n")
       shell: python
 
+    - name: Patch build_deps.py with AVX flags
+      if: env.AVX_CMAKE_FLAGS != ''
+      run: |
+        import os
+        
+        cmake_flags = os.environ.get('AVX_CMAKE_FLAGS', '')
+        if not cmake_flags:
+            print("No AVX flags to patch")
+            exit(0)
+        
+        # Read the file
+        with open('pymnn/pip_package/build_deps.py', 'r') as f:
+            content = f.read()
+        
+        # Find the line with extra_opts = '-DMNN_LOW_MEMORY=ON' and append cmake_flags
+        # We need to insert cmake_flags after the initial extra_opts assignment
+        old_line = "    extra_opts = '-DMNN_LOW_MEMORY=ON'"
+        new_line = f"    extra_opts = '-DMNN_LOW_MEMORY=ON' + ' {cmake_flags}'"
+        
+        if old_line in content:
+            content = content.replace(old_line, new_line)
+            print(f"Patched build_deps.py with: {new_line}")
+        else:
+            print(f"Warning: Could not find line to patch: {old_line}")
+            exit(1)
+        
+        # Write back
+        with open('pymnn/pip_package/build_deps.py', 'w') as f:
+            f.write(content)
+        
+        print("Successfully patched build_deps.py")
+      shell: python
+
     - name: Build wheels
       uses: pypa/cibuildwheel@v2.21.3
       env:
@@ -354,16 +387,62 @@ jobs:
       id: build_tag
       run: |
         import os
+        import re
+        from pathlib import Path
         
-        tag_version = "${{ inputs.tag_name }}" or "v1.0.0"
-        cuda_version = "${{ inputs.cuda_version }}"
-        avxver = "${{ inputs.avxver }}"
-        build_date = "${{ inputs.build_date }}"
+        # Priority 1: Try to extract version from wheel filename
+        dist_dir = Path("dist")
+        wheel_files = list(dist_dir.glob("*.whl"))
+        
+        tag_version = None
+        cuda_version = None
+        avxver = None
+        build_date = None
+        
+        if wheel_files:
+            # Extract info from first wheel file
+            wheel_name = wheel_files[0].name
+            print(f"Extracting version from wheel: {wheel_name}")
+            
+            # Pattern: mnn-3.4.0-cp310-cp310-xxx.whl
+            version_match = re.match(r'mnn-([\d.]+)', wheel_name, re.IGNORECASE)
+            if version_match:
+                tag_version = f"v{version_match.group(1)}"
+                print(f"Extracted version from wheel: {tag_version}")
+        
+        # Priority 2: Use input values if provided
+        input_tag_name = "${{ inputs.tag_name }}"
+        input_cuda_version = "${{ inputs.cuda_version }}"
+        input_avxver = "${{ inputs.avxver }}"
+        input_build_date = "${{ inputs.build_date }}"
+        
+        if input_tag_name:
+            tag_version = input_tag_name
+            print(f"Using input tag_name: {tag_version}")
+        
+        if input_cuda_version:
+            cuda_version = input_cuda_version
+            print(f"Using input cuda_version: {cuda_version}")
+        
+        if input_avxver:
+            avxver = input_avxver
+            print(f"Using input avxver: {avxver}")
+        
+        if input_build_date:
+            build_date = input_build_date
+            print(f"Using input build_date: {build_date}")
+        
+        # Priority 3: Use defaults if still not set
+        if not tag_version:
+            tag_version = "v1.0.0"
+            print(f"Using default tag_version: {tag_version}")
         
         if not build_date:
             from datetime import datetime
             build_date = datetime.now().strftime("%Y%m%d")
+            print(f"Using default build_date: {build_date}")
         
+        # Build final tag
         tag_parts = [tag_version]
         if cuda_version:
             tag_parts.append(f"cu{cuda_version}")
