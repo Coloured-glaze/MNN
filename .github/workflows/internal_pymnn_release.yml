@@ -20,6 +20,55 @@ on:
           - '1'
           - '0'
         default: '0'
+      repository:
+        description: 'Code repo (leave empty for current repo)'
+        default: ''
+        required: false
+        type: string
+      tag_name:
+        description: 'Tag name for release (e.g., v3.4.0)'
+        default: ''
+        required: false
+        type: string
+      create_release:
+        description: 'Create GitHub Release'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '0'
+        default: '0'
+      build_date:
+        description: 'Build date (YYYYMMDD, leave empty for today)'
+        default: ''
+        required: false
+        type: string
+      cuda_version:
+        description: 'CUDA version for tag (e.g., 12.1)'
+        default: ''
+        required: false
+        type: string
+      avxver:
+        description: 'AVX version for tag (e.g., avx2, avx512)'
+        default: ''
+        required: false
+        type: string
+      enable_avx2:
+        description: 'Enable AVX2 compilation (x86_64 only)'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '0'
+        default: '1'
+      enable_avx512:
+        description: 'Enable AVX512 compilation (x86_64 only, requires AVX2)'
+        required: true
+        type: choice
+        options:
+          - '1'
+          - '0'
+        default: '0'
 
 jobs:
   build_wheels:
@@ -37,6 +86,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         submodules: true
+        repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
 
     - name: using msvc
       if: matrix.os == 'windows-latest'
@@ -191,6 +241,72 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
       shell: bash
 
+    - name: Set release environment variables
+      id: set_env
+      run: |
+        import os
+        from datetime import datetime
+        
+        # Set tag version
+        tag_name = "${{ inputs.tag_name }}"
+        if not tag_name:
+            tag_name = "v${{ steps.get_version.outputs.version }}"
+        print(f"TAG_VERSION={tag_name}")
+        with open(os.environ['GITHUB_ENV'], 'a') as f:
+            f.write(f"TAG_VERSION={tag_name}\n")
+        
+        # Set build date
+        build_date = "${{ inputs.build_date }}"
+        if not build_date:
+            build_date = datetime.now().strftime("%Y%m%d")
+        print(f"BUILD_DATE={build_date}")
+        with open(os.environ['GITHUB_ENV'], 'a') as f:
+            f.write(f"BUILD_DATE={build_date}\n")
+        
+        # Set CUDA version
+        cuda_version = "${{ inputs.cuda_version }}"
+        if cuda_version:
+            print(f"CUDA_VERSION={cuda_version}")
+            with open(os.environ['GITHUB_ENV'], 'a') as f:
+                f.write(f"CUDA_VERSION={cuda_version}\n")
+        
+        # Set AVX version
+        avxver = "${{ inputs.avxver }}"
+        if avxver:
+            print(f"AVXVER={avxver}")
+            with open(os.environ['GITHUB_ENV'], 'a') as f:
+                f.write(f"AVXVER={avxver}\n")
+        
+        # Set AVX compile flags
+        enable_avx2 = "${{ inputs.enable_avx2 }}"
+        enable_avx512 = "${{ inputs.enable_avx512 }}"
+        
+        # Build CMAKE flags for AVX options
+        cmake_flags = []
+        if enable_avx2 == '0':
+            cmake_flags.append("-DMNN_AVX2=OFF")
+        if enable_avx512 == '1':
+            cmake_flags.append("-DMNN_AVX512=ON")
+        
+        if cmake_flags:
+            avx_cmake_flags = " ".join(cmake_flags)
+            print(f"AVX_CMAKE_FLAGS={avx_cmake_flags}")
+            with open(os.environ['GITHUB_ENV'], 'a') as f:
+                f.write(f"AVX_CMAKE_FLAGS={avx_cmake_flags}\n")
+        
+        # Auto-set avxver tag if not provided
+        if not avxver:
+            if enable_avx512 == '1':
+                avxver = "avx512"
+            elif enable_avx2 == '1':
+                avxver = "avx2"
+            else:
+                avxver = "noavx"
+            print(f"Auto-set AVXVER={avxver}")
+            with open(os.environ['GITHUB_ENV'], 'a') as f:
+                f.write(f"AVXVER={avxver}\n")
+      shell: python
+
     - name: Build wheels
       uses: pypa/cibuildwheel@v2.21.3
       env:
@@ -199,9 +315,9 @@ jobs:
         CIBW_ARCHS_WINDOWS: ${{ matrix.arch }}
         CIBW_BUILD: ${{ env.CIBW_BUILD }}
         CIBW_BUILD_VERBOSITY: 1
-        CIBW_ENVIRONMENT_LINUX: MNN_USE_SYSTEM_LIB=true MNN_SEP_BUILD=false CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
-        CIBW_ENVIRONMENT_MACOS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
-        CIBW_ENVIRONMENT_WINDOWS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
+        CIBW_ENVIRONMENT_LINUX: MNN_USE_SYSTEM_LIB=true MNN_SEP_BUILD=false CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
+        CIBW_ENVIRONMENT_MACOS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
+        CIBW_ENVIRONMENT_WINDOWS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
       with:
         package-dir: pymnn/pip_package
         output-dir: wheelhouse
@@ -216,3 +332,57 @@ jobs:
       with:
         name: artifact-${{ matrix.os }}-${{ matrix.arch }}
         path: wheelhouse/*.whl
+
+  create_release:
+    name: Create Release
+    needs: [build_wheels]
+    runs-on: ubuntu-latest
+    if: always() && inputs.create_release == '1'
+    
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: artifact-*
+        path: dist
+        merge-multiple: true
+
+    - name: Show files
+      run: ls -lh dist
+
+    - name: Build tag name
+      id: build_tag
+      run: |
+        import os
+        
+        tag_version = "${{ inputs.tag_name }}" or "v1.0.0"
+        cuda_version = "${{ inputs.cuda_version }}"
+        avxver = "${{ inputs.avxver }}"
+        build_date = "${{ inputs.build_date }}"
+        
+        if not build_date:
+            from datetime import datetime
+            build_date = datetime.now().strftime("%Y%m%d")
+        
+        tag_parts = [tag_version]
+        if cuda_version:
+            tag_parts.append(f"cu{cuda_version}")
+        if avxver:
+            tag_parts.append(avxver)
+        tag_parts.append(f"win-{build_date}")
+        
+        final_tag = "-".join(tag_parts)
+        print(f"Final tag: {final_tag}")
+        
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f"tag_name={final_tag}\n")
+      shell: python
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2.3.3
+      with:
+        files: dist/*
+        tag_name: ${{ steps.build_tag.outputs.tag_name }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -233,6 +233,7 @@ jobs:
                 'images': [
                     { 'data': img, 'height': 420, 'width': 420 }
                 ]
-            }
+                }
+            print(f'use prompt text: {prompt_text}')
             generate_example(model, prompt)
-            print('\n\n============================================================')
+            print('\n\n============================================================ END')
