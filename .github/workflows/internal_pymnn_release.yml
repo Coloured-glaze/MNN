@@ -316,8 +316,8 @@ jobs:
         CIBW_BUILD: ${{ env.CIBW_BUILD }}
         CIBW_BUILD_VERBOSITY: 1
         CIBW_ENVIRONMENT_LINUX: MNN_USE_SYSTEM_LIB=true MNN_SEP_BUILD=false CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
-        CIBW_ENVIRONMENT_MACOS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
-        CIBW_ENVIRONMENT_WINDOWS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
+        CIBW_ENVIRONMENT_MACOS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_SEP_BUILD=false MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
+        CIBW_ENVIRONMENT_WINDOWS: CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_SEP_BUILD=false MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}" CMAKE_ARGS="${{ env.AVX_CMAKE_FLAGS }}"
       with:
         package-dir: pymnn/pip_package
         output-dir: wheelhouse
