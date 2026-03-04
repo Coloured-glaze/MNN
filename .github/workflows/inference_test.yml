@@ -189,7 +189,7 @@ jobs:
       run: |
         cd pymnn/pip_package
         python build_deps.py ${{ steps.build_options.outputs.build_args }}
-        python setup.py bdist_wheel --version ${{ steps.get_version.outputs.version }}
+        python setup.py bdist_wheel 
         mkdir ..\..\wheelhouse
         cp dist/*.whl ..\..\wheelhouse\
         ls -lh ..\..\wheelhouse
