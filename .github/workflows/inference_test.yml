@@ -23,8 +23,8 @@ on:
         required: true
         type: string
       run_os:
-        description: 'Run OS (comma-separated for multiple: ubuntu-22.04,windows-latest,macos-latest)'
-        default: 'ubuntu-22.04'
+        description: 'Run OS (comma-separated for multiple: ubuntu-22.04,windows-latest,ubuntu-24.04-arm)'
+        default: 'ubuntu-22.04, windows-latest'
         required: true
         type: string
 
@@ -56,21 +56,21 @@ jobs:
       fail-fast: false
       matrix:
         os: ${{ fromJson(needs.parse_os_input.outputs.os_matrix) }}
-        include:
-          - os: ubuntu-22.04
-            arch: x86_64
-          - os: ubuntu-24.04
-            arch: x86_64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-          - os: windows-2019
-            arch: x86_64
-          - os: windows-2022
-            arch: x86_64
-          - os: windows-latest
-            arch: x86_64
 
     steps:
+    - name: Set architecture based on OS
+      run: |
+        import os
+        runner_os = "${{ matrix.os }}"
+        if "arm" in runner_os.lower():
+            arch = "arm64"
+        else:
+            arch = "x86_64"
+        with open(os.environ['GITHUB_ENV'], 'a') as f:
+            f.write(f"TARGET_ARCH={arch}\n")
+        print(f"OS: {runner_os}, Architecture: {arch}")
+      shell: python
+
     - uses: actions/checkout@v4
       with:
         submodules: true
