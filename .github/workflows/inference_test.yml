@@ -186,7 +186,7 @@ jobs:
     - name: Build wheels (Windows)
       if: ${{ runner.os == 'Windows' }}
       run: |
-        pip install packaging ninja build wheel setuptools
+        pip install packaging ninja build wheel setuptools numpy 
         cd pymnn/pip_package
         python build_deps.py ${{ steps.build_options.outputs.build_args }}
         python setup.py bdist_wheel 
@@ -205,7 +205,7 @@ jobs:
     - name: Upload wheels
       uses: actions/upload-artifact@v4
       with:
-        name: artifact-${{ matrix.os }}-${{ matrix.arch }}
+        name: artifact-${{ matrix.os }}
         path: wheelhouse/*.whl
         compression-level: 9 
         retention-days: 14
