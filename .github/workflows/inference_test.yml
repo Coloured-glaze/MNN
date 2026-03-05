@@ -23,7 +23,7 @@ on:
         required: true
         type: string
       run_os:
-        description: 'Run OS (comma-separated for multiple: ubuntu-22.04,windows-latest,ubuntu-24.04-arm)'
+        description: 'Run OS (comma-separated for multiple: ubuntu-22.04,ubuntu-24.04-arm,windows-2025,windows-latest,)'
         default: 'ubuntu-22.04, windows-latest'
         required: true
         type: string
@@ -246,7 +246,12 @@ jobs:
             first_token = model.tokenizer_decode(token)
             print(f"token: {token}, first word: {first_token}")
             print(first_token, end='', flush=True) # first token
+            token_count = 1  # 已生成1个token
+            max_tokens = 1024
             while True:
+                if token_count >= max_tokens:
+                    print(f"\n\n[警告] 生成的token数量已超过 {max_tokens} 限制")
+                    break
                 logits = model.forward(token)
                 token = np.argmax(logits)
                 model.context.current_token = token
@@ -257,6 +262,7 @@ jobs:
                     print(f"解码token {token} {type(token)} 时出错: {str(e)}")
                     word = ""
                 print(word, end='', flush=True)
+                token_count += 1
 
         model_path = os.environ.get('model_dir', '')
         print(f"model_path: {model_path}")
@@ -288,6 +294,6 @@ jobs:
                     { 'data': img, 'height': 420, 'width': 420 }
                 ]
                 }
-            print(f'use prompt text: {prompt_text}')
+            print(f'\nuse prompt text: {prompt_text}')
             generate_example(model, prompt)
             print('\n\n============================================================ END')
