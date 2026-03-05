@@ -227,6 +227,11 @@ jobs:
     - name : Run tests
       shell: python
       run: |
+        import sys
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+        
         import MNN.llm as llm
         import MNN.cv as cv, MNN.numpy as np
         import os 
