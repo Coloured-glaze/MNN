@@ -14,7 +14,7 @@ on:
         type: string
       model_repo:
         description: 'HuggingFace model repo, taobao-mnn/Qwen3-VL-2B-Instruct-MNN, taobao-mnn/Qwen3-VL-4B-Instruct-MNN, taobao-mnn/Qwen3-VL-2B-Instruct-Eagle3-MNN, taobao-mnn/Qwen3-VL-4B-Instruct-Eagle3-MNN'
-        default: 'taobao-mnn/Qwen3-VL-2B-Instruct-MNN'
+        default: 'taobao-mnn/Qwen3.5-2B-MNN'
         required: true
         type: string
       repository:
@@ -49,7 +49,7 @@ jobs:
         shell: python
 
   build_wheels:
-    name: Build wheels on ${{ matrix.os }} (${{ matrix.arch }})
+    name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: parse_os_input
     strategy:
@@ -171,9 +171,8 @@ jobs:
       if: ${{ runner.os != 'Windows' }}
       uses: pypa/cibuildwheel@v2.21.3
       env:
-        CIBW_ARCHS_MACOS: ${{ matrix.arch }}
-        CIBW_ARCHS_LINUX: ${{ matrix.arch }}
-        CIBW_ARCHS_WINDOWS: ${{ matrix.arch }}
+        CIBW_ARCHS_MACOS: "native"
+        CIBW_ARCHS_LINUX: "native"
         CIBW_BUILD: ${{ env.CIBW_BUILD }}
         CIBW_BUILD_VERBOSITY: 1
         CIBW_ENVIRONMENT_LINUX: MNN_USE_SYSTEM_LIB=true MNN_SEP_BUILD=false CMAKE_BUILD_PARALLEL_LEVEL=2 MNN_VERSION=${{ steps.get_version.outputs.version }} BUILD_ARGS="${{ steps.build_options.outputs.build_args }}"
@@ -187,6 +186,7 @@ jobs:
     - name: Build wheels (Windows)
       if: ${{ runner.os == 'Windows' }}
       run: |
+        pip install packaging ninja build wheel setuptools
         cd pymnn/pip_package
         python build_deps.py ${{ steps.build_options.outputs.build_args }}
         python setup.py bdist_wheel 
